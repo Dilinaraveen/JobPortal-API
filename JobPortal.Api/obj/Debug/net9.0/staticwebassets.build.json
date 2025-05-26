@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "b+Sczpx1kVzpHccu2odl1/wkcI/T6MPhFp0LB89pkck=",
+  "Source": "JobPortal.Api",
+  "BasePath": "_content/JobPortal.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
