@@ -1,10 +1,9 @@
+// ApplicationController.cs (Refactored)
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using JobPortal.Api.Data;
 using JobPortal.Api.DTOs;
-using JobPortal.Api.Models;
+using JobPortal.Api.Services.Interfaces;
 
 namespace JobPortal.Api.Controllers
 {
@@ -12,150 +11,66 @@ namespace JobPortal.Api.Controllers
     [Route("api/[controller]")]
     public class ApplicationController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IApplicationService _applicationService;
 
-        public ApplicationController(ApplicationDbContext context)
+        public ApplicationController(IApplicationService applicationService)
         {
-            _context = context;
+            _applicationService = applicationService;
         }
 
-        // ✅ 1. Apply to a job
         [Authorize(Roles = "Applicant")]
         [HttpPost]
         public async Task<IActionResult> Apply(ApplicationCreateDto dto)
         {
             var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (applicantId == null)
-                return Unauthorized();
+            if (applicantId == null) return Unauthorized();
 
-            // Prevent duplicate application
-            var alreadyApplied = await _context.JobApplications.AnyAsync(a =>
-                a.JobId == dto.JobId && a.ApplicantId == Guid.Parse(applicantId));
-            if (alreadyApplied)
-                return Conflict("You have already applied to this job.");
-
-            var application = new JobApplication
-            {
-                Id = Guid.NewGuid(),
-                JobId = dto.JobId,
-                ApplicantId = Guid.Parse(applicantId),
-                CoverLetter = dto.CoverLetter
-            };
-
-            _context.JobApplications.Add(application);
-            await _context.SaveChangesAsync();
-
-            return Ok("Application submitted successfully.");
+            var result = await _applicationService.ApplyAsync(dto, Guid.Parse(applicantId));
+            return result == null ? Ok("Application submitted successfully.") : Conflict(result);
         }
 
-        // ✅ 2. Get your own applications
         [Authorize(Roles = "Applicant")]
         [HttpGet("mine")]
         public async Task<IActionResult> GetMyApplications()
         {
             var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (applicantId == null)
-                return Unauthorized();
+            if (applicantId == null) return Unauthorized();
 
-            var applications = await _context.JobApplications
-                .Include(a => a.Job)
-                .Where(a => a.ApplicantId == Guid.Parse(applicantId))
-                .Select(a => new ApplicationReadDto
-                {
-                    Id = a.Id,
-                    JobTitle = a.Job.Title,
-                    CoverLetter = a.CoverLetter,
-                    Status = a.Status,
-                    AppliedAt = a.AppliedAt,
-                    ApplicantName = a.Applicant.FullName,
-                    ApplicantEmail = a.Applicant.Email
-                })
-                .ToListAsync();
-
+            var applications = await _applicationService.GetMyApplicationsAsync(Guid.Parse(applicantId));
             return Ok(applications);
         }
 
-        // ✅ 3. Get applications for a job (employer only)
         [Authorize(Roles = "Employer")]
         [HttpGet("job/{jobId}")]
         public async Task<IActionResult> GetApplicationsForJob(Guid jobId)
         {
             var employerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (employerId == null)
-                return Unauthorized("You are not allowed to view applications for this job.");
+            if (employerId == null) return Unauthorized();
 
-            var job = await _context.JobPostings
-                .FirstOrDefaultAsync(j => j.Id == jobId && j.EmployerId == Guid.Parse(employerId));
-
-            if (job == null)
-                return Unauthorized("You are not allowed to view applications for this job.");
-
-            var applications = await _context.JobApplications
-                .Include(a => a.Applicant)
-                .Where(a => a.JobId == jobId)
-                .Select(a => new ApplicationReadDto
-                {
-                    Id = a.Id,
-                    JobTitle = job.Title,
-                    CoverLetter = a.CoverLetter,
-                    Status = a.Status,
-                    AppliedAt = a.AppliedAt,
-                    ApplicantName = a.Applicant.FullName,
-                    ApplicantEmail = a.Applicant.Email
-                })
-                .ToListAsync();
-
-            return Ok(applications);
+            var apps = await _applicationService.GetApplicationsForJobAsync(jobId, Guid.Parse(employerId));
+            return apps == null ? Unauthorized("You are not allowed to view applications for this job.") : Ok(apps);
         }
 
-        // ✅ Update status of an application (Employer only)
         [Authorize(Roles = "Employer")]
         [HttpPatch("{applicationId}/status")]
         public async Task<IActionResult> UpdateApplicationStatus(Guid applicationId, ApplicationStatusUpdateDto dto)
         {
             var employerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (employerId == null)
-                return Unauthorized();
+            if (employerId == null) return Unauthorized();
 
-            var application = await _context.JobApplications
-                .Include(a => a.Job)
-                .FirstOrDefaultAsync(a => a.Id == applicationId);
-
-            if (application == null)
-                return NotFound("Application not found.");
-
-            if (application.Job.EmployerId != Guid.Parse(employerId))
-                return StatusCode(403, "You are not authorized to update this application.");
-
-            application.Status = dto.Status;
-            await _context.SaveChangesAsync();
-
-            return Ok("Application status updated successfully.");
+            var result = await _applicationService.UpdateApplicationStatusAsync(applicationId, Guid.Parse(employerId), dto.Status);
+            return result == null ? Ok("Application status updated successfully.") : StatusCode(403, result);
         }
-
 
         [Authorize(Roles = "Applicant")]
         [HttpDelete("{applicationId}")]
         public async Task<IActionResult> WithdrawApplication(Guid applicationId)
         {
             var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (applicantId == null)
-                return Unauthorized();
+            if (applicantId == null) return Unauthorized();
 
-            var application = await _context.JobApplications.FirstOrDefaultAsync(a =>
-                a.Id == applicationId && a.ApplicantId == Guid.Parse(applicantId));
-
-            if (application == null)
-                return NotFound("Application not found or access denied.");
-
-            // 🔐 Only allow if status is still "Submitted"
-            if (application.Status != "Submitted")
-                return StatusCode(403, $"Cannot withdraw application after it has been {application.Status.ToLower()}.");
-
-            _context.JobApplications.Remove(application);
-            await _context.SaveChangesAsync();
-
-            return Ok("Application withdrawn successfully.");
+            var result = await _applicationService.WithdrawApplicationAsync(applicationId, Guid.Parse(applicantId));
+            return result == null ? Ok("Application withdrawn successfully.") : StatusCode(403, result);
         }
 
         [Authorize(Roles = "Applicant")]
@@ -163,24 +78,10 @@ namespace JobPortal.Api.Controllers
         public async Task<IActionResult> UpdateApplication(Guid applicationId, ApplicationUpdateDto dto)
         {
             var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (applicantId == null)
-                return Unauthorized();
+            if (applicantId == null) return Unauthorized();
 
-            var application = await _context.JobApplications
-                .FirstOrDefaultAsync(a => a.Id == applicationId && a.ApplicantId == Guid.Parse(applicantId));
-
-            if (application == null)
-                return NotFound("Application not found or access denied.");
-
-            if (application.Status != "Submitted")
-                return StatusCode(403, $"Cannot update application after it has been {application.Status.ToLower()}.");
-
-            application.CoverLetter = dto.CoverLetter;
-            await _context.SaveChangesAsync();
-
-            return Ok("Application updated successfully.");
+            var result = await _applicationService.UpdateApplicationAsync(applicationId, Guid.Parse(applicantId), dto.CoverLetter);
+            return result == null ? Ok("Application updated successfully.") : StatusCode(403, result);
         }
-
-
     }
 }
