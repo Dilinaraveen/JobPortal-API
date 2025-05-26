@@ -18,7 +18,7 @@ namespace JobPortal.Api.Models
         public string Location { get; set; }
 
         [Required]
-        public string JobType { get; set; }  // e.g., Full-Time, Part-Time
+        public string JobType { get; set; } 
 
         public decimal? SalaryMin { get; set; }
         public decimal? SalaryMax { get; set; }
@@ -33,7 +33,7 @@ namespace JobPortal.Api.Models
         public Guid EmployerId { get; set; }
 
         [ForeignKey("EmployerId")]
-        public User Employer { get; set; }
+        public User? Employer { get; set; }
 
         public ICollection<JobApplication>? Applications { get; set; }
         public ICollection<SavedJob>? SavedByUsers { get; set; }

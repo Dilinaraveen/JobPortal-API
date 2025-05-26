@@ -16,14 +16,14 @@ namespace JobPortal.Api.Models
 
         public string? CoverLetter { get; set; }
 
-        public string Status { get; set; } = "Submitted";  // or Viewed, Shortlisted, Rejected
+        public string Status { get; set; } = "Submitted"; 
 
         public DateTime AppliedAt { get; set; } = DateTime.UtcNow;
 
         [ForeignKey("JobId")]
-        public JobPosting Job { get; set; }
+        public JobPosting? Job { get; set; }
 
         [ForeignKey("ApplicantId")]
-        public User Applicant { get; set; }
+        public User? Applicant { get; set; }
     }
 }
