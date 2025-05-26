@@ -133,5 +133,32 @@ namespace JobPortal.Api.Controllers
             return Ok("Application status updated successfully.");
         }
 
+
+        [Authorize(Roles = "Applicant")]
+        [HttpDelete("{applicationId}")]
+        public async Task<IActionResult> WithdrawApplication(Guid applicationId)
+        {
+            var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (applicantId == null)
+                return Unauthorized();
+
+            var application = await _context.JobApplications.FirstOrDefaultAsync(a =>
+                a.Id == applicationId && a.ApplicantId == Guid.Parse(applicantId));
+
+            if (application == null)
+                return NotFound("Application not found or access denied.");
+
+            // 🔐 Only allow if status is still "Submitted"
+            if (application.Status != "Submitted")
+                return StatusCode(403, $"Cannot withdraw application after it has been {application.Status.ToLower()}.");
+
+            _context.JobApplications.Remove(application);
+            await _context.SaveChangesAsync();
+
+            return Ok("Application withdrawn successfully.");
+        }
+
+
+
     }
 }
