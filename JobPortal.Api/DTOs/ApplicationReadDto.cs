@@ -6,16 +6,16 @@ namespace JobPortal.Api.DTOs
     {
         public Guid Id { get; set; }
 
-        public string JobTitle { get; set; }
+        public required string JobTitle { get; set; }
 
         public string? CoverLetter { get; set; }
 
-        public string Status { get; set; }
+        public required string Status { get; set; }
 
         public DateTime AppliedAt { get; set; }
 
-        public string ApplicantName { get; set; }
+        public required string ApplicantName { get; set; }
 
-        public string ApplicantEmail { get; set; }
+        public required string ApplicantEmail { get; set; }
     }
 }

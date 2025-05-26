@@ -5,6 +5,6 @@ namespace JobPortal.Api.DTOs
     public class ApplicationStatusUpdateDto
     {
         [Required]
-        public string Status { get; set; }
+        public required string Status { get; set; }
     }
 }

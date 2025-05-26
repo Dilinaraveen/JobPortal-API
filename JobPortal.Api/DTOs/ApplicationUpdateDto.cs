@@ -5,6 +5,6 @@ namespace JobPortal.Api.DTOs
     public class ApplicationUpdateDto
     {
         [Required]
-        public string CoverLetter { get; set; }
+        public required string CoverLetter { get; set; }
     }
 }
