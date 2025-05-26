@@ -107,5 +107,31 @@ namespace JobPortal.Api.Controllers
 
             return Ok(applications);
         }
+
+        // ✅ Update status of an application (Employer only)
+        [Authorize(Roles = "Employer")]
+        [HttpPatch("{applicationId}/status")]
+        public async Task<IActionResult> UpdateApplicationStatus(Guid applicationId, ApplicationStatusUpdateDto dto)
+        {
+            var employerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (employerId == null)
+                return Unauthorized();
+
+            var application = await _context.JobApplications
+                .Include(a => a.Job)
+                .FirstOrDefaultAsync(a => a.Id == applicationId);
+
+            if (application == null)
+                return NotFound("Application not found.");
+
+            if (application.Job.EmployerId != Guid.Parse(employerId))
+                return StatusCode(403, "You are not authorized to update this application.");
+
+            application.Status = dto.Status;
+            await _context.SaveChangesAsync();
+
+            return Ok("Application status updated successfully.");
+        }
+
     }
 }
