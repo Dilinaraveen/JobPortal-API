@@ -1,10 +1,7 @@
+// AuthController.cs (Refactored)
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using JobPortal.Api.Data;
 using JobPortal.Api.DTOs;
-using JobPortal.Api.Helpers;
-using JobPortal.Api.Models;
-using BCrypt.Net;
+using JobPortal.Api.Services.Interfaces;
 
 namespace JobPortal.Api.Controllers
 {
@@ -12,46 +9,30 @@ namespace JobPortal.Api.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly JwtService _jwt;
+        private readonly IAuthService _authService;
 
-        public AuthController(ApplicationDbContext context, JwtService jwt)
+        public AuthController(IAuthService authService)
         {
-            _context = context;
-            _jwt = jwt;
+            _authService = authService;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register(UserRegisterDto dto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
-                return BadRequest("Email already exists.");
+            var (success, token, error) = await _authService.RegisterAsync(dto);
+            if (!success)
+                return BadRequest(error);
 
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
-                FullName = dto.FullName,
-                Email = dto.Email,
-                Role = dto.Role,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            var token = _jwt.GenerateToken(user);
             return Ok(new { token });
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-                return Unauthorized("Invalid credentials.");
+            var (success, token, error) = await _authService.LoginAsync(dto);
+            if (!success)
+                return Unauthorized(error);
 
-            var token = _jwt.GenerateToken(user);
             return Ok(new { token });
         }
     }
