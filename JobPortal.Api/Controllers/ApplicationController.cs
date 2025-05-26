@@ -158,6 +158,28 @@ namespace JobPortal.Api.Controllers
             return Ok("Application withdrawn successfully.");
         }
 
+        [Authorize(Roles = "Applicant")]
+        [HttpPut("{applicationId}")]
+        public async Task<IActionResult> UpdateApplication(Guid applicationId, ApplicationUpdateDto dto)
+        {
+            var applicantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (applicantId == null)
+                return Unauthorized();
+
+            var application = await _context.JobApplications
+                .FirstOrDefaultAsync(a => a.Id == applicationId && a.ApplicantId == Guid.Parse(applicantId));
+
+            if (application == null)
+                return NotFound("Application not found or access denied.");
+
+            if (application.Status != "Submitted")
+                return StatusCode(403, $"Cannot update application after it has been {application.Status.ToLower()}.");
+
+            application.CoverLetter = dto.CoverLetter;
+            await _context.SaveChangesAsync();
+
+            return Ok("Application updated successfully.");
+        }
 
 
     }
